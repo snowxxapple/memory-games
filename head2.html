@@ -1,0 +1,319 @@
+<html>
+
+<head lang='zh'>
+    <meta charset='utf-8'>
+    <title>记忆力游戏</title>
+    <style type="text/css">
+    header {
+        width: 860px;
+        height: 80px;
+        margin: auto;
+        background: #2ADEBE;
+        margin-bottom: 10px;
+        border-radius: 10px;
+        text-align: center;
+        padding-top: 15px;
+        font-size: 40px;
+        font-weight: bold;
+        color: white;
+        box-sizing: border-box;
+        /*css3新特性 使得添加了padding margin后的盒子依然高度不变*/
+    }
+    
+    #cv {
+        margin: auto;
+        background: #66cccc;
+        border-radius: 10px;
+    }
+    
+    #btn {
+        z-index: 10;
+        width: 120;
+        height: 60;
+        background: #ffff66;
+        color: rgba(50, 173, 247, 0.88);
+        position: absolute;
+        font-size: 25px;
+        font-weight: bold;
+        border-radius: 10px;
+    }
+    </style>
+</head>
+
+<body>
+    <header>记忆力游戏</header>
+    <canvas width='860' height='650' id='cv' style='display:block;'></canvas>
+    <button id='btn'>开始</button>
+</body>
+<script type="text/javascript">
+var ctx = document.getElementById('cv').getContext('2d');
+var info;
+var backColor = '#ccff50'; //牌背面
+var polyColor = '#ff99cc'; //牌花色
+var cvColor = '#66cccc'; //游戏背景
+var cardWidth = 120;
+var cardHeight = 120;
+var cardSx = 20;
+var cardSy = 20;
+var cardMargin = 20;
+var firstCard;
+var secondCard;
+var card = [];
+var image = ['img/1.jpg', 'img/2.jpg', 'img/3.jpg', 'img/4.jpg', 'img/5.jpg', 'img/6.jpg', 'img/7.jpg', 'img/8.jpg', 'img/9.jpg', 'img/10.jpg', 'img/11.jpg', 'img/12.jpg'];
+var firstClick = true; //标志位 是否第一次点击
+var cardRad = 30;
+var firstCardFront;
+var secondCardFront;
+var matchNum = 0;
+var first;
+var second;
+var timer;
+var btnColor;
+var timer2;
+var cvs = document.getElementById('cv');
+var btnWidth = 100;
+var btnHeight = 50;
+var btnSx = (parseInt(cvs.width) - btnWidth) * 0.5;
+var btnSy = 670;
+var timeShow = 0;
+var radius = 10;
+var oBtn = document.getElementById('btn');
+
+//牌的反面构造函数
+function Card(sx, sy, swidth, sheight, info, img) {
+    this.sx = sx;
+    this.sy = sy;
+    this.swidth = swidth;
+    this.sheight = sheight;
+    this.info = info;
+    this.img = img; //img属性是一个image对象
+    this.draw = drawBack;
+}
+
+function drawBack() {
+    ctx.shadowOffsetX = 5;
+    ctx.shadowOffsetY = 5;
+    ctx.shadowBlur = 4;
+    ctx.shadowColor = 'grey';
+    ctx.fillStyle = backColor;
+    ctx.fillRect(this.sx, this.sy, this.swidth, this.sheight);
+    
+}
+
+function Poly(img, sx, sy, swidth, sheight) {
+    this.sx = sx;
+    this.sy = sy;
+    this.img = img;
+    this.swidth = swidth;
+    this.sheight = sheight;
+    this.draw = drawPoly;
+}
+
+function drawPoly() {
+    ctx.shadowOffsetX = 5;
+    ctx.shadowOffsetY = 5;
+    ctx.shadowBlur = 4;
+    ctx.shadowColor = 'grey';
+    ctx.drawImage(this.img, this.sx, this.sy, this.swidth, this.sheight);
+    
+}
+
+function makeDeck() {
+    //生成一副牌 
+    for (var i = 0; i < image.length; i++) {
+        var pic = new Image();
+        pic.src = image[i];
+        if (i <= 5) {
+            firstCard = new Card(cardSx, cardSy, cardWidth, cardHeight, i, pic);
+            secondCard = new Card(cardSx, cardSy + cardHeight + cardMargin, cardWidth, cardHeight, i, pic);
+        }
+
+        if (i > 5) {
+            if (i == 6) {
+                cardSx = 20;
+            }
+            firstCard = new Card(cardSx, cardSy + 2 * cardHeight + 2 * cardMargin, cardWidth, cardHeight, i, pic);
+            secondCard = new Card(cardSx, cardSy + 3 * cardHeight + 3 * cardMargin, cardWidth, cardHeight, i, pic);
+        }
+        card.push(firstCard);
+        card.push(secondCard);
+
+        cardSx = cardSx + cardWidth + cardMargin;
+
+    }
+    //洗牌 洗牌次数为牌数目的4倍 两两交换洗牌
+    var holder1;
+    var holder2;
+    var hold;
+    var hold2;
+    for (var j = 1; j < card.length * 4; j++) {
+        holder1 = Math.floor(Math.random() * card.length);
+        holder2 = Math.floor(Math.random() * card.length);
+        hold = card[holder1].info;
+        hold2 = card[holder1].img;
+        card[holder1].info = card[holder2].info;
+        card[holder1].img = card[holder2].img;
+        card[holder2].info = hold;
+        card[holder2].img = hold2;
+    }
+    //把牌背面画出来
+    for (var n = 0; n < card.length; n++) {
+        card[n].draw();
+    }
+}
+
+function timeCompute() {
+    timeShow = timeShow + 1;
+    ctx.clearRect(btnSx + btnWidth + 10, btnSy - 100, 500, 300);
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'black';
+    ctx.font = 'bold 30px sans-serif';
+    ctx.fillText('用时:' + timeShow + '秒', btnSx + btnWidth + 30, btnSy - 60);
+}
+
+function choose(ev) {
+    var mx;
+    var my;
+    if (ev.layerX || ev.layerX == 0) {
+        mx = ev.layerX;
+        my = ev.layerY;
+    }
+    if (ev.offsetX || ev.offsetX == 0) {
+        mx = ev.offsetX;
+        my = ev.offsetY;
+    }
+    console.log(mx, my);
+    //鼠标点击按钮 
+    
+    for (var i = 0; i < card.length; i++) {
+        if (card[i].sx >= 0) {
+
+            if (mx >= card[i].sx && mx <= (card[i].sx + card[i].swidth) && my >= (card[i].sy) && my <= (card[i].sy + card[i].sheight)) {
+                //第一次点击
+                if (firstClick) {
+                    firstCardFront = new Poly(card[i].img, card[i].sx, card[i].sy, card[i].swidth, card[i].sheight);
+                    ctx.clearRect(firstCardFront.sx, firstCardFront.sy, cardWidth + 15, cardHeight + 15);
+                    firstCardFront.draw();
+                    firstClick = false; //表示第一次点击结束
+                    first = i; //牌在card里面的位置
+                    break;
+                }
+                //第二次点击
+                if (!firstClick) {
+                    // secondCardFront = new Poly(card[i].sx + cardWidth * 0.5, card[i].sy + cardHeight * 0.5, cardRad, card[i].info);
+                    secondCardFront = new Poly(card[i].img, card[i].sx, card[i].sy, card[i].swidth, card[i].sheight);
+
+                    ctx.clearRect(secondCardFront.sx, secondCardFront.sy, cardWidth + 15, cardHeight + 15);
+
+                    secondCardFront.draw();
+                    firstClick = true; //两次点击结束 
+                    second = i;
+                    if (first == second) { //如果两次点击的是同一张牌 那么跳出循环
+                        drawAgain(); //把牌翻回背面
+                        break;
+                    }
+                    match(); //两次点击结束才会判断是否match
+
+                    break;
+                }
+            }
+        }
+    }
+    //检测是否完成配对 配对数目为牌数*0.5
+}
+
+function clearMatch() {
+    matchNum = matchNum + 1;
+
+    ctx.clearRect(10, btnSy - 100, 500, 300); //清除配对数 文字
+    ctx.fillStyle = cvColor;
+    //擦除牌
+    ctx.clearRect(firstCardFront.sx, firstCardFront.sy, cardWidth + 15, cardHeight + 15);
+    ctx.clearRect(secondCardFront.sx, secondCardFront.sy, cardWidth + 15, cardHeight + 15);
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.shadowBlur = 0;
+    ctx.font = 'bold 30px sans-serif';
+    ctx.fillStyle = 'black';
+    ctx.fillText('成功配对' + matchNum + '对', 20, btnSy - 60);
+    card[first].sx = -1;
+    card[second].sx = -1;
+    var cvs = document.getElementById('cv');
+    cvs.addEventListener('click', choose, false);
+    if (matchNum == 0.5 * card.length) { //如果全部佩顿完毕
+        console.log('win');
+        clearInterval(timer2);
+        ctx.clearRect(10, btnSy - 100, 500, 300);
+        ctx.fillStyle = backColor;
+        ctx.font = 'bold 60px sans-serif';
+        ctx.fillText('YOU WIN!', 350, 300);
+        oBtn.innerHTML = '重新开始';
+        oBtn.disabled = '';
+        cvs.removeEventListener('click', choose, false);
+    }
+}
+
+function drawAgain() {
+    ctx.clearRect(firstCardFront.sx, firstCardFront.sy, cardWidth + 15, cardHeight + 15);
+    ctx.clearRect(secondCardFront.sx, secondCardFront.sy, cardWidth + 15, cardHeight + 15);
+    card[first].draw();
+    card[second].draw();
+    cvs.addEventListener('click', choose, false);
+}
+
+function match() {
+    cvs.removeEventListener('click', choose, false);
+    //如果两次点击的为一对 清除牌 并显示信息
+    if (card[first].info == card[second].info) {
+        //清除牌
+        timer = setTimeout(clearMatch, 500);
+    }
+    //如果两次点击的不是一对牌 
+    if (card[first].info != card[second].info) {
+        timer = setTimeout(drawAgain, 500);
+    }
+}
+window.onload = function() {
+    oBtn.style.left = btnSx + (parseInt(document.body.clientWidth || document.documentElement.clientWidth) - parseInt(cvs.width)) * 0.5 + 'px';
+    oBtn.style.top = btnSy + 'px';
+    makeDeck();
+    oBtn.onmouseover = function() {
+        oBtn.style.background = '#ccff99';
+        oBtn.onmouseout = function() {
+            oBtn.style.background = '#ffff66';
+        }
+    }
+    oBtn.onclick = function() {
+        if (oBtn.innerHTML == '开始') {
+            oBtn.disabled = 'disabled';
+            timeShow = 0;
+            timeCompute();
+            timer2 = setInterval(timeCompute, 1000);
+            cvs.addEventListener('click', choose, false);
+        }
+        if (oBtn.innerHTML == '重新开始') {
+            //一局结束 重新开始
+            //擦除画布上所有内容
+            ctx.clearRect(0, 0, 930, 700);
+            //清空card数组 以便重新生成牌数组
+            card.splice(0, card.length);
+            //重新赋值cardSx cardSy 否则为生成的最后一张牌的坐标
+            cardSx = 30;
+            cardSy = 50;
+            //清空配对计数
+            matchNum = 0;
+            //重新生成一副牌 并洗牌
+            makeDeck();
+            //重新计时
+            timeShow = 0;
+            timeCompute();
+            timer2 = setInterval(timeCompute, 1000);
+            cvs.addEventListener('click', choose, false);
+        }
+    }
+}
+</script>
+
+</html>
